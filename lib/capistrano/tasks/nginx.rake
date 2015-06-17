@@ -11,9 +11,10 @@ namespace :load do
     set :nginx_roles,               -> { :web }
     set :nginx_template,            -> { :default }
     set :nginx_use_ssl,             -> { false }
-    set :nginx_ssl_certificate,          -> { "#{fetch(:application)}.crt" }
+    set :nginx_application,         -> { "#{application}" }
+    set :nginx_ssl_certificate,          -> { "#{fetch(:nginx_application)}.crt" }
     set :nginx_ssl_certificate_path,     -> { '/etc/ssl/certs' }
-    set :nginx_ssl_certificate_key,      -> { "#{fetch(:application)}.crt" }
+    set :nginx_ssl_certificate_key,      -> { "#{fetch(:nginx_application)}.crt" }
     set :nginx_ssl_certificate_key_path, -> { '/etc/ssl/private' }
     set :app_server,                     -> { true }
   end
@@ -44,8 +45,8 @@ namespace :nginx do
   task :load_vars do
     set :sites_available,       -> { File.join(fetch(:nginx_root_path), fetch(:nginx_sites_available_dir)) }
     set :sites_enabled,         -> { File.join(fetch(:nginx_root_path), fetch(:nginx_sites_enabled_dir)) }
-    set :enabled_application,   -> { File.join(fetch(:sites_enabled),   fetch(:application)) }
-    set :available_application, -> { File.join(fetch(:sites_available), fetch(:application)) }
+    set :enabled_application,   -> { File.join(fetch(:sites_enabled),   fetch(:nginx_application)) }
+    set :available_application, -> { File.join(fetch(:sites_available), fetch(:nginx_application)) }
   end
 
   # validate_sudo_settings
@@ -108,7 +109,7 @@ namespace :nginx do
           end
           config = ERB.new(File.read(config_file)).result(binding)
           upload! StringIO.new(config), '/tmp/nginx.conf'
-          arguments = :mv, '/tmp/nginx.conf', fetch(:application)
+          arguments = :mv, '/tmp/nginx.conf', fetch(:nginx_application)
           add_sudo_if_required arguments, 'nginx:sites:add', :nginx_sites_available_dir
           execute *arguments
         end
@@ -133,7 +134,7 @@ namespace :nginx do
       on release_roles fetch(:nginx_roles) do
         if test "[ -f #{fetch(:enabled_application)} ]"
           within fetch(:sites_enabled) do
-            arguments = :rm, '-f', fetch(:application)
+            arguments = :rm, '-f', fetch(:nginx_application)
             add_sudo_if_required arguments, 'nginx:sites:disable', :nginx_sites_enabled_dir
             execute *arguments
           end
@@ -146,7 +147,7 @@ namespace :nginx do
       on release_roles fetch(:nginx_roles) do
         if test "[ -f #{fetch(:available_application)} ]"
           within fetch(:sites_available) do
-            arguments = :rm, fetch(:application)
+            arguments = :rm, fetch(:nginx_application)
             add_sudo_if_required arguments, 'nginx:sites:remove', :nginx_sites_available_dir
             execute *arguments
           end
